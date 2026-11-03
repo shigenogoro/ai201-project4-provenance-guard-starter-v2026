@@ -47,7 +47,19 @@ def words(text: str) -> list[str]:
 
 # ── The three measures — YOU BUILD THESE ─────────────────────────────────────
 
-def sentence_length_spread(text: str) -> float:
+# Calibration, read off the 30 samples (see README). Each range is
+# (human end, AI end): the raw value that maps to 0.0 and to 1.0.
+SPREAD_RANGE = (0.60, 0.20)   # sample means: human ~0.6, AI ~0.27
+TTR_RANGE = (0.70, 0.90)      # sample means: human ~0.78, AI ~0.84
+PUNCT_RANGE = (3.0, 0.0)      # sample means: human ~1.8-3.0, AI ~0.8
+TTR_WINDOW = 60
+
+# Spread separates best; TTR's gap is small, so it counts least.
+STYLE_WEIGHT_SPREAD = 0.5
+STYLE_WEIGHT_TTR = 0.2
+STYLE_WEIGHT_PUNCT = 0.3
+
+def sentence_length_spread(text: str) -> float | None:
     """
     How much sentence length varies. ← TODO
 
@@ -63,9 +75,15 @@ def sentence_length_spread(text: str) -> float:
     Watch the edge case: a one-sentence submission has no spread at all, and
     `stdev` raises on fewer than two values. Decide what that should return
     before the attack set decides for you.
+
+    Decided: coefficient of variation (stdev / mean). LOW = more AI-like.
+    One sentence returns None: "can't measure" must not count as evidence,
+    so style_signal treats it as neutral.
     """
-    # TODO: replace this
-    return 0.0
+    lengths = [len(words(s)) for s in sentences(text)]
+    if len(lengths) < 2:
+        return None
+    return statistics.stdev(lengths) / statistics.mean(lengths)
 
 
 def type_token_ratio(text: str) -> float:
@@ -79,9 +97,14 @@ def type_token_ratio(text: str) -> float:
     longer, because common words repeat. Two texts of different lengths aren't
     directly comparable on it, and if your test inputs vary a lot in length,
     that alone can look like a signal.
+
+    Decided: computed on the first TTR_WINDOW words only, so length doesn't
+    leak in. Direction is the OPPOSITE of the usual assumption — on my samples
+    AI scored higher (≈0.84) than human (≈0.78): AI reaches for many distinct
+    "polished" words, people repeat function words. HIGH = more AI-like.
     """
-    # TODO: replace this
-    return 0.0
+    ws = words(text)[:TTR_WINDOW]
+    return len(set(ws)) / len(ws) if ws else 0.0
 
 
 def punctuation_density(text: str) -> float:
@@ -93,9 +116,14 @@ def punctuation_density(text: str) -> float:
         semicolons, dashes — is a real choice. Semicolons and em dashes are
         more interesting than full stops, because they vary more between
         writers.
+
+    Decided: only the "rich" marks — ; : ( ) and dashes — per 100 words.
+    Total punctuation scored ~14 for AI, human and L2 alike: no signal.
+    LOW = more AI-like. Known cost: the L2 samples use none of these at all.
     """
-    # TODO: replace this
-    return 0.0
+    ws = words(text)
+    marks = re.findall(r"[;:()—–-]", text)
+    return 100 * len(marks) / len(ws) if ws else 0.0
 
 
 # ── Combining them ───────────────────────────────────────────────────────────
@@ -122,8 +150,19 @@ def style_signal(text: str) -> float:
     you trust it. Plain and ordinary, not formal: formal prose reads as *human*
     to signal one, and it is plain writing that gets accused.
     """
-    # TODO: replace this
-    return 0.5
+    parts = [
+        (STYLE_WEIGHT_SPREAD, _scale(sentence_length_spread(text), *SPREAD_RANGE)),
+        (STYLE_WEIGHT_TTR, _scale(type_token_ratio(text), *TTR_RANGE)),
+        (STYLE_WEIGHT_PUNCT, _scale(punctuation_density(text), *PUNCT_RANGE)),
+    ]
+    return round(sum(w * v for w, v in parts), 4)
+
+
+def _scale(value, human_end: float, ai_end: float) -> float:
+    """Map a raw measure onto 0 (human end) .. 1 (AI end), clamped. None -> 0.5."""
+    if value is None:
+        return 0.5
+    return min(max((value - human_end) / (ai_end - human_end), 0.0), 1.0)
 
 
 if __name__ == "__main__":
@@ -139,4 +178,3 @@ if __name__ == "__main__":
     print(f"type_token_ratio         {type_token_ratio(text)}")
     print(f"punctuation_density      {punctuation_density(text)}")
     print(f"style_signal             {style_signal(text)}   (higher = more likely AI)")
-    print("\nAll zeros? These are stubs — Milestone 4 is where you build them.")

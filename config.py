@@ -61,6 +61,10 @@ MIN_WORDS = 20
 WEIGHT_MODEL_SIGNAL = 0.5
 WEIGHT_STYLE_SIGNAL = 0.5
 
+# If the two signals differ by more than this, the combined score is pulled
+# into the unsure band: two methods disagreeing IS uncertainty.
+DISAGREEMENT_GAP = 0.3
+
 
 # ─── Thresholds (Milestone 5) ────────────────────────────────────────────────
 # Where one label becomes another. Scores run 0.0 (confidently human) to 1.0
@@ -76,7 +80,10 @@ WEIGHT_STYLE_SIGNAL = 0.5
 # that decide who pays for it.
 
 HUMAN_THRESHOLD = 0.35
-AI_THRESHOLD = 0.65
+# Raised from 0.65: my second-language samples averaged 0.71 and topped out at
+# 0.79, overlapping the AI samples (0.72–0.89). 0.80 accuses none of them, at
+# the cost of roughly half the AI samples landing in "unsure".
+AI_THRESHOLD = 0.80
 
 # ⚠️ One thing that catches people out in Milestone 5. A weighted average can
 # only land between its two inputs — so while `style_signal` is still the stub

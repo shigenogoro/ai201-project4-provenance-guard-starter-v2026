@@ -53,36 +53,46 @@
 
 ### Signal one — the model signal
 
-**What it measures:**
+**What it measures:** how predictable the text is to GPT-2, run locally (`detector.py::model_signal`). Perplexity is squashed onto 0–1 with a logistic (midpoint 45, steepness 1.6, starter defaults, unchanged). Higher = more AI-like.
 
-**Why that might differ between human and AI writing:**
+**Why that might differ between human and AI writing:** AI picks each next word from a probability distribution, favouring likely words, so another language model finds the result easy to predict. People choose words for what they mean, which produces more surprising choices.
 
-**What it can't see:**
+**What it can't see:** predictability is not authorship. Writers with limited or deliberately plain vocabulary — second-language writers, younger writers — are as predictable as AI. My 10 second-language samples averaged **0.70**, against **0.84** for AI and **0.52** for native human prose. In the other direction, AI text with rare words scores human. Light human edits also go unseen: `borderline_02_sports` (AI text with my own hockey anecdote added) scored 0.79, the same as the unedited AI piece next to it.
 
 ### Signal two — the style signal
 
-**What it measures:**
+**What it measures:** the shape of the text, without reading it (`stylometry.py::style_signal`). Three measures, each scaled to 0 (human end) – 1 (AI end) and clamped:
 
-**Why that might differ between human and AI writing:**
+| Measure | Raw value | Human end → AI end | Weight |
+|---|---|---|---|
+| Sentence length spread | stdev / mean of sentence lengths | 0.60 → 0.20 | 0.5 |
+| Type-token ratio | unique / total, first 60 words only | 0.70 → 0.90 | 0.2 |
+| Rich punctuation | `; : ( ) — – -` per 100 words | 3.0 → 0.0 | 0.3 |
 
-**What it can't see:**
+A one-sentence text has no spread; it counts as neutral (0.5) rather than as evidence.
+
+**Why that might differ between human and AI writing:** AI regresses to the typical sentence, so lengths cluster around an average; people write a three-word sentence next to a forty-word one. Native writers reach for semicolons and dashes; AI mostly doesn't.
+
+Two findings from calibration changed the design:
+- **Type-token ratio ran the opposite way from the usual assumption.** AI scored *higher* (≈0.84 on the first 60 words) than human prose (≈0.78): AI uses many distinct polished words, people repeat function words. I flipped it and gave it the lowest weight because the gap is small.
+- **Total punctuation density didn't discriminate at all** — about 14 per 100 words for AI, human and second-language samples alike. I dropped it for rich punctuation only.
+
+**What it can't see:** meaning. Anything that changes shape without changing substance moves it — breaking up sentences, pasting a quotation, adding a dash. And human writing that is uniform by convention scores AI-like: my second-language samples have spread 0.31 (AI ≈0.27) and **zero** rich punctuation, so they average 0.72 on this signal too.
 
 ### The combining rule
 
-<!-- Write the rule in words, then give the numbers. What happens when the two
-     signals disagree? -->
+**The rule:** weighted average of the two signals. If they disagree by more than 0.3, the result is capped just below the AI threshold, so it can be "unsure" but never "AI". The cap is one-sided on purpose: disagreement can block an accusation, but never takes away a "human" label. (A two-sided version pulled clearly human pieces up into "unsure" and left no "human" label in my coverage set.)
 
-**The rule:**
-
-**The numbers:**
+**The numbers:** (`config.py`)
+- `WEIGHT_MODEL_SIGNAL = 0.5`, `WEIGHT_STYLE_SIGNAL = 0.5` — the two separate about equally well on my samples, so neither gets more weight.
+- `DISAGREEMENT_GAP = 0.3`
+- `HUMAN_THRESHOLD = 0.35`, `AI_THRESHOLD = 0.80` — AI raised from the starter's 0.65. My second-language samples top out at 0.79 combined and overlap the AI samples (0.72–0.89). At 0.65, 8 of 10 would be labelled AI; at 0.80, none are. The cost: 4 of 9 AI samples land in "unsure" instead of "AI".
 
 **Where it lives:** `scoring.py::combine_signals`
 
-<!-- ⚠️ The grader checks your code against that line. If your rule lives
-     somewhere else, say where. -->
+**A case where my two signals split, and what my rule does with it:** `samples/coverage/human_01_three_men.txt` (Jerome K. Jerome, 1889). Model signal **0.74**: plain, everyday vocabulary that GPT-2 predicts easily. Style signal **0.32**: sentence lengths vary widely. The gap is 0.42 > 0.3, so the cap applies. The average is 0.53, already below the cap, so it stays at 0.53, which is "unsure". Without the cap, a piece averaging above 0.80 with signals this far apart would have been labelled AI on one signal's say-so.
 
-**A case where my two signals split, and what my rule does with it:**
-
+**Calibration caveat:** the ranges, weights and thresholds above were read off the same 30 samples that `criteria.md` checks against. That flatters the results. Unit 8's unseen attack set is the honest test.
 
 
 ---
