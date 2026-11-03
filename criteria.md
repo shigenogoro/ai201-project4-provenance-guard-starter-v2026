@@ -42,63 +42,95 @@ Two things worth knowing before you pick numbers:
   a **miss**.
 
 ---
-## 1.
+## 1. False positives on second-language writers
 
-<!-- Your criterion. It must name a number. -->
-
-
+A fixed set of 10 English pieces written by second-language writers
+(`samples/human_l2/`). Run the whole set 3 times. In **every** run, at most
+**2 of 10** are labelled high-confidence AI.
 
 **Why this target:**
 
-
+A second-language writer is the person both signals are most likely to
+accuse at once: familiar words make the text predictable to the model, and
+familiar sentence patterns make it look even to stylometry. Averaging two
+signals that share a blind spot does not cancel the error. On a writing site a
+wrong accusation costs the writer far more than a missed detection costs the
+site, so I allow at most 2 in 10 — and it must hold in every run, because the
+model signal can drift between runs.
 
 ---
 
-## 2.
+## 2. Score spread between clearly-AI and clearly-human text
 
-<!-- Your criterion. -->
-
-
+A fixed set of 5 clearly-AI pieces (`samples/ai/` — generated, unedited) and
+5 clearly-human pieces (`samples/human/`). Mean `confidence` of the AI set
+minus mean `confidence` of the human set is **≥ 0.75**, in all 3 runs.
 
 **Why this target:**
 
-
+My thresholds are 0.35 and 0.65, so a gap of 0.3 is the minimum for the two
+groups to land in different labels. 0.75 asks for much more: clearly-AI and
+clearly-human text should sit near opposite ends of the scale, not just on
+either side of a line. If the easy cases aren't far apart, the hard cases have
+no chance.
 
 ---
 
-## 3.
+## 3. Every label is reachable
 
-<!-- Your criterion. -->
-
-
+A fixed set of 10 pieces (`samples/coverage/`): 4 AI, 4 human, 2 I judge
+borderline. In each of 3 runs, `human`, `unsure` and `ai` each appear as the
+`guess` **at least once**.
 
 **Why this target:**
 
-
+Three labels only mean something if all three can actually be produced. A
+gap in the ranges — or a style signal that barely moves — can make a label
+unreachable, and the "unsure" label is the one that protects writers like the
+one in criterion 1. The set is fixed in advance so I can't pick inputs after
+seeing the scores.
 
 ---
 
-## 4.
+## 4. Every appeal is recorded and moves to under_review
 
-<!-- Your criterion. -->
-
-
+Appeal 5 existing `content_id`s once each: **5 of 5** return 200, and the log
+holds an entry for each with `event: appeal`, `status: under_review`, and
+`reasoning` identical to what was sent. Also: 1 appeal on a non-existent id
+returns **404**; a second appeal on the same id returns **409**; the original
+`decided` entry is unchanged.
 
 **Why this target:**
 
-
+The appeal is the only thing a wrongly accused writer can do. If an appeal
+is ever lost, misrecorded, or silently overwrites the original decision, that
+writer has nothing. So this has to be 5 of 5, not most: the log must show what
+was decided, that it was challenged, and in what order.
 
 ---
 
-## 5.
+## 5. Bad input is rejected, never crashes
 
-<!-- Your criterion. -->
+Each of these 7 inputs returns **400** with the listed `error` code and leaves
+one `rejected` entry in the log. **0 of 7** return 500.
 
-
+| # | Input | `error` |
+|---|---|---|
+| 1 | body is not JSON | `invalid_json` |
+| 2 | `text` missing | `missing_field` |
+| 3 | `text` is `""` | `missing_field` |
+| 4 | `text` is `123` | `missing_field` |
+| 5 | `creator_id` missing | `missing_field` |
+| 6 | `text` is 5 words | `text_too_short` |
+| 7 | `text` over 400 tokens | `text_too_long` |
 
 **Why this target:**
 
-
+A crash on malformed input is one of the most common real failures, and
+unit 8's attack set will probe exactly these edges. A 500 tells the caller
+nothing and leaves no trace; a 400 with a specific code tells them what to fix,
+and the `rejected` log entry means an attack that only shows up as bad input
+is still visible.
 
 ---
 
