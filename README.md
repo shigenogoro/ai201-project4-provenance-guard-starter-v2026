@@ -36,9 +36,16 @@
 
 ## What This Does
 
-<!-- The path a submission takes, from arriving to the label a reader sees.
-     Six or seven steps — this is the trace you wrote in Milestone 1. -->
+Provenance Guard is a small backend a writing site can plug into. Text comes in; a guess, a confidence score, and a plain-English label go back, and the writer can appeal.
 
+1. **The writer sends text.** `POST /submit` with `{"text": ..., "creator_id": ...}`.
+2. **`app.py` checks the input.** Missing or non-string fields, empty text, fewer than 20 words, or more than 400 tokens get a `400` with a specific `error` code, and the rejection is still written to the audit log. Nothing below runs.
+3. **`app.py` assigns a `content_id`** (uuid). The log entry and any later appeal use it.
+4. **Signal one, `detector.py::model_signal`**, runs GPT-2 locally and turns perplexity into a 0–1 `model_score` (higher = more AI-like).
+5. **Signal two, `stylometry.py::style_signal`**, measures the text's shape (sentence length spread, vocabulary variety, rich punctuation) and returns a 0–1 `style_score`.
+6. **`scoring.py::combine_signals`** merges them into `confidence`, and **`scoring.py::score_to_label`** maps that to `human` / `unsure` / `ai` plus the full sentence the reader sees.
+7. **`audit.py::log_decision`** appends the decision (both signal scores, the combined score, guess, label, status `decided`) to `logs/audit.jsonl`, and the response returns `content_id`, `guess`, `confidence`, `label`, `model_score`, `style_score`.
+8. **If the writer disagrees**, `POST /appeal` with the `content_id` and their explanation records the appeal next to the original decision and moves the item to `under_review` for a person to look at. Nothing is re-scored.
 
 
 ---
@@ -197,17 +204,19 @@ $ curl "http://127.0.0.1:5000/log?limit=2"
 
 ## How I Used AI
 
-**Moment 1**
+I worked through the project with Claude Code as a guide, milestone by milestone. Two moments changed what I built:
 
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+**Moment 1: the "unsure" label**
 
-**Moment 2**
+- *What I asked for:* I wrote a first draft of the unsure and AI labels, roughly "Sorry, the system can't tell whether this was written by a person or AI because of its sentence structure, vocabulary and punctuation. If you wrote it, please give reasoning so the system can re-evaluate." I asked for feedback written from the writer's point of view, not a rewrite.
+- *What came back:* Read as a second-language writer, the label said "your English is the problem" and "prove you're innocent". It also promised a re-evaluation that my `/appeal` contract says never happens. And on my samples most genuine human writing, including all 10 of my own paragraphs, lands in "unsure", so I'd be asking most innocent writers to defend themselves.
+- *What I changed:* the unsure label now just says honestly that we couldn't tell, that it isn't an accusation or a judgement of their writing, and that they don't need to do anything. The AI label says a person, not the computer, reviews appeals, and asks for an "explanation" instead of "reasoning".
 
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+**Moment 2: the disagreement rule**
+
+- *What I asked for:* I chose a weighted average plus a rule that forces "unsure" when the two signals differ by more than 0.3, and had Claude implement it and run all 30 samples through `/submit`.
+- *What came back:* the rule worked in both directions, so it also pulled clearly human pieces *up* into "unsure". `tom_sawyer_03` went from 0.20 to 0.36, for example, and the coverage set no longer produced a single "human" label, which would fail criterion 3. Pulling a score up protects nobody; it only takes away a "human" label.
+- *What I changed:* I made the rule one-sided (`scoring.py::combine_signals`). Disagreement can cap a score below the AI threshold but never raises one. The coverage set went back to producing all three labels, and the second-language result (0 of 10 labelled AI) stayed the same.
 
 <!-- ═══════════════════════ UNIT 8 — THE TEST ═══════════════════════ -->
 
