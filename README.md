@@ -106,71 +106,39 @@ Two findings from calibration changed the design:
 
 | Label | Score range | The exact text a reader sees |
 |---|---|---|
-| high-confidence human |  |  |
-| unsure |  |  |
-| high-confidence AI |  |  |
+| high-confidence human | 0.00 – 0.35 | We think this was probably written by a person. |
+| unsure | above 0.35, below 0.80 | We couldn't tell whether this was written by a person or with AI. This is not an accusation, and it says nothing about the quality of your writing — a lot of people's own work lands here. You don't need to do anything. |
+| high-confidence AI | 0.80 – 1.00 | We think this was probably written with AI. Our check can be wrong, especially with plain or simple writing. If you wrote this yourself, you can appeal: tell us in your own words how you wrote it — for example, where the idea came from or what drafts you made. A person, not the computer, will review your appeal. |
+
+The text lives in `scoring.py` (`LABEL_HUMAN`, `LABEL_UNSURE`, `LABEL_AI`); the ranges come from `config.py`. Every score from 0 to 1 maps to exactly one label, and all three appear on my sample set.
 
 **Why I worded the "unsure" one this way:**
-<!-- It's the hardest of the three. It has to admit uncertainty without
-     sounding like an accusation, because the person reading it may well have
-     written every word themselves. -->
 
+All 10 of my second-language samples — my own writing — land in "unsure", and so do most of the native human samples. So the typical reader of this label wrote every word. My first draft explained *why* ("because of the sentence structure, vocabulary and punctuation") and asked the writer to give reasoning so the system could re-evaluate. Read as that writer, it said two things I didn't mean: *your English is the problem*, and *prove you're innocent*. It also promised a re-evaluation the system doesn't do. So the final version only says honestly that we couldn't tell, says outright that it is not an accusation or a judgement of their writing, and asks nothing of them.
 
 
 ---
 
 ## Sample Run
 
-<!-- One submission and one appeal, pasted as text: the request, the response,
-     and the log entries. -->
+Run against the live service (`python app.py`), one piece from `samples/ai/03_climate.txt`.
 
 **A submission**
-
-<!-- The response needs content_id, guess, confidence, label, AND both
-     signal scores - model_score and style_score. Unit 8's tools read those
-     two off the response, so leaving them out costs you next unit's
-     diagnostics. -->
 
 ```bash
 $ curl -X POST http://127.0.0.1:5000/submit \
   -H "Content-Type: application/json" \
-  -d '{"text": "Remote work has transformed the way organizations operate in the modern era. By allowing employees to work from anywhere, companies can access a wider pool of talent and reduce overhead costs. Additionally, employees often benefit from increased flexibility.", "creator_id": "writer-01"}'
-```
-
-> Milestone 3 snapshot — one signal wired in; `confidence`, `guess` and
-> `label` are still placeholders. Replaced with the full run in Milestone 5.
-
-```json
-{
-  "confidence": 0.5,
-  "content_id": "e0371d5d-d9b4-49b3-aba2-4676a9af980b",
-  "guess": "unsure",
-  "label": "placeholder",
-  "model_score": 0.7435,
-  "style_score": 0.0
-}
-```
-
-```bash
-$ curl "http://127.0.0.1:5000/log?limit=5"
+  -d '{"text": "Climate change is one of the most pressing issues facing humanity today. Rising global temperatures are leading to more frequent and severe weather events, including hurricanes, droughts, and heatwaves. These changes have significant impacts on ecosystems, agriculture, and human health. One of the primary drivers of climate change is the burning of fossil fuels, which releases greenhouse gases into the atmosphere. To mitigate these effects, it is essential to transition to renewable energy sources such as solar and wind power. Additionally, individuals can contribute by reducing energy consumption, using public transportation, and supporting sustainable practices. Governments also play a crucial role by implementing policies that encourage emissions reductions. While the challenge is significant, collective action at every level can make a meaningful difference in protecting the planet for future generations.", "creator_id": "writer-02"}'
 ```
 
 ```json
 {
-  "count": 1,
-  "entries": [
-    {
-      "combined_score": null,
-      "content_id": "e0371d5d-d9b4-49b3-aba2-4676a9af980b",
-      "creator_id": "writer-01",
-      "guess": "unsure",
-      "label": null,
-      "model_score": 0.7435,
-      "status": "decided",
-      "style_score": null,
-      "timestamp": "2026-11-03T16:00:41+00:00"
-    }
-  ]
+  "confidence": 0.8816,
+  "content_id": "d4ff6775-7bf6-4841-9870-417c023c8cec",
+  "guess": "ai",
+  "label": "We think this was probably written with AI. Our check can be wrong, especially with plain or simple writing. If you wrote this yourself, you can appeal: tell us in your own words how you wrote it — for example, where the idea came from or what drafts you made. A person, not the computer, will review your appeal.",
+  "model_score": 0.9337,
+  "style_score": 0.8295
 }
 ```
 
@@ -179,21 +147,50 @@ $ curl "http://127.0.0.1:5000/log?limit=5"
 ```bash
 $ curl -X POST http://127.0.0.1:5000/appeal \
   -H "Content-Type: application/json" \
-  -d '{"content_id": "...", "reasoning": "..."}'
+  -d '{"content_id": "d4ff6775-7bf6-4841-9870-417c023c8cec", "reasoning": "I wrote this for my environmental science class. I outlined the causes and solutions first, then wrote it in one sitting."}'
 ```
 
 ```json
-
+{
+  "content_id": "d4ff6775-7bf6-4841-9870-417c023c8cec",
+  "message": "Your appeal was received. A person will review this piece and your explanation.",
+  "status": "under_review"
+}
 ```
 
 **What the log shows afterwards**
 
+The original decision is untouched; the appeal is appended after it.
+
 ```bash
-$ curl "http://127.0.0.1:5000/log?limit=3"
+$ curl "http://127.0.0.1:5000/log?limit=2"
 ```
 
 ```json
-
+{
+  "count": 2,
+  "entries": [
+    {
+      "combined_score": 0.8816,
+      "content_id": "d4ff6775-7bf6-4841-9870-417c023c8cec",
+      "creator_id": "writer-02",
+      "guess": "ai",
+      "label": "We think this was probably written with AI. Our check can be wrong, especially with plain or simple writing. If you wrote this yourself, you can appeal: tell us in your own words how you wrote it — for example, where the idea came from or what drafts you made. A person, not the computer, will review your appeal.",
+      "model_score": 0.9337,
+      "status": "decided",
+      "style_score": 0.8295,
+      "timestamp": "2026-11-03T16:23:49+00:00"
+    },
+    {
+      "content_id": "d4ff6775-7bf6-4841-9870-417c023c8cec",
+      "creator_id": "writer-02",
+      "event": "appeal",
+      "reasoning": "I wrote this for my environmental science class. I outlined the causes and solutions first, then wrote it in one sitting.",
+      "status": "under_review",
+      "timestamp": "2026-11-03T16:23:54+00:00"
+    }
+  ]
+}
 ```
 
 ---
