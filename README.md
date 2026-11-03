@@ -124,11 +124,44 @@
 ```bash
 $ curl -X POST http://127.0.0.1:5000/submit \
   -H "Content-Type: application/json" \
-  -d '{"text": "...", "creator_id": "..."}'
+  -d '{"text": "Remote work has transformed the way organizations operate in the modern era. By allowing employees to work from anywhere, companies can access a wider pool of talent and reduce overhead costs. Additionally, employees often benefit from increased flexibility.", "creator_id": "writer-01"}'
+```
+
+> Milestone 3 snapshot — one signal wired in; `confidence`, `guess` and
+> `label` are still placeholders. Replaced with the full run in Milestone 5.
+
+```json
+{
+  "confidence": 0.5,
+  "content_id": "e0371d5d-d9b4-49b3-aba2-4676a9af980b",
+  "guess": "unsure",
+  "label": "placeholder",
+  "model_score": 0.7435,
+  "style_score": 0.0
+}
+```
+
+```bash
+$ curl "http://127.0.0.1:5000/log?limit=5"
 ```
 
 ```json
-
+{
+  "count": 1,
+  "entries": [
+    {
+      "combined_score": null,
+      "content_id": "e0371d5d-d9b4-49b3-aba2-4676a9af980b",
+      "creator_id": "writer-01",
+      "guess": "unsure",
+      "label": null,
+      "model_score": 0.7435,
+      "status": "decided",
+      "style_score": null,
+      "timestamp": "2026-11-03T16:00:41+00:00"
+    }
+  ]
+}
 ```
 
 **An appeal**

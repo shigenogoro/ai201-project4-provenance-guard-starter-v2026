@@ -30,6 +30,7 @@ from flask import Flask, jsonify, request
 
 import audit
 import config
+import detector
 
 app = Flask(__name__)
 
@@ -199,17 +200,55 @@ def submit():
     what should this do when `text` is missing, empty, or enormous? A crash on
     a malformed input is one of the most common real failures there is.
     """
-    payload = request.get_json(silent=True) or {}
+    payload = request.get_json(silent=True)
+    if not isinstance(payload, dict):
+        return _reject(None, "invalid_json", "Send a JSON object with text and creator_id.")
 
-    # TODO: delete this and build the route.
+    text = payload.get("text")
+    creator_id = payload.get("creator_id")
+    if not _non_empty_str(text) or not _non_empty_str(creator_id):
+        return _reject(creator_id, "missing_field",
+                       "text and creator_id are both required, as non-empty strings.")
+    if len(text.split()) < config.MIN_WORDS:
+        return _reject(creator_id, "text_too_short",
+                       f"Please submit at least {config.MIN_WORDS} words.")
+    if detector.token_count(text) > config.DETECTOR_MAX_TOKENS:
+        return _reject(creator_id, "text_too_long",
+                       "This piece is too long to check. Please submit about 300 words or fewer.")
+
+    content_id = str(uuid.uuid4())
+    model_score = detector.model_signal(text)
+
+    # style_score, combined_score, label stay None in the log until Milestones 4–5.
+    audit.log_decision(
+        content_id=content_id,
+        creator_id=creator_id,
+        guess="unsure",
+        model_score=model_score,
+        status="decided",
+    )
+
     return jsonify({
-        "error": "not_implemented",
-        "message": "POST /submit isn't built yet — see the TODO in app.py.",
-        "you_sent": {
-            "text_length": len(payload.get("text", "")),
-            "creator_id": payload.get("creator_id"),
-        },
-    }), 501
+        "content_id": content_id,
+        "guess": "unsure",          # placeholder until Milestone 5
+        "confidence": 0.5,          # placeholder until Milestone 4
+        "label": "placeholder",     # placeholder until Milestone 5
+        "model_score": model_score,
+        "style_score": 0.0,         # placeholder until Milestone 4
+    })
+
+
+def _non_empty_str(value) -> bool:
+    return isinstance(value, str) and bool(value.strip())
+
+
+def _reject(creator_id, error: str, message: str):
+    """A 400 that still leaves a trace in the audit log."""
+    audit.log_rejection(
+        creator_id=creator_id if _non_empty_str(creator_id) else "unknown",
+        reason=error,
+    )
+    return jsonify({"error": error, "message": message}), 400
 
 
 @app.post("/appeal")

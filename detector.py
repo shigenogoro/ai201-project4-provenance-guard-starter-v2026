@@ -113,6 +113,12 @@ def perplexity(text: str) -> float:
     return float(math.exp(output.loss.item()))
 
 
+def token_count(text: str) -> int:
+    """How many tokens the model would see, before truncation."""
+    _, tokenizer = _load()
+    return len(tokenizer(text)["input_ids"])
+
+
 def model_signal(text: str) -> float:
     """
     The signal, as a 0–1 score. **Higher means more likely AI.**
