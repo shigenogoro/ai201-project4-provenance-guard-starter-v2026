@@ -218,6 +218,34 @@ I worked through the project with Claude Code as a guide, milestone by milestone
 - *What came back:* the rule worked in both directions, so it also pulled clearly human pieces *up* into "unsure". `tom_sawyer_03` went from 0.20 to 0.36, for example, and the coverage set no longer produced a single "human" label, which would fail criterion 3. Pulling a score up protects nobody; it only takes away a "human" label.
 - *What I changed:* I made the rule one-sided (`scoring.py::combine_signals`). Disagreement can cap a score below the AI threshold but never raises one. The coverage set went back to producing all three labels, and the second-language result (0 of 10 labelled AI) stayed the same.
 
+**Unit 8**
+
+In unit 8 I had Claude Code do most of the hands-on work. It ran the service, the
+flood test, the attack set and the criteria, computed the stage-by-stage scores, and
+drafted the verdicts, diagnoses and this write-up. I directed it milestone by
+milestone. Four moments are worth recording:
+
+- **It installed packages into the wrong Python.** It ran `pip install -r
+  requirements.txt` against my global Python 3.14 (unsupported here) instead of the
+  project's `.venv`, which already had everything. I stopped it and had it
+  uninstall only what that run had added, checking install times first so it didn't
+  remove packages I already had.
+- **Its first baseline was wrong, and it caught that.** To show the evasions weren't
+  doing the work, it first used PI02's text minus the SYSTEM line as the
+  "unedited AI" baseline. That text turned out to be cut off in the CSV after two
+  sentences (27 words), so it rebuilt the 85-word baseline from EV02 instead.
+- **The sweep corrected its own diagnosis.** It first blamed criterion 2's miss on
+  signal one's midpoint. A sweep showed moving the midpoint barely changes the gap,
+  and the arithmetic showed 0.75 is unreachable under a 50/50 average with signal
+  two at 0.49. The diagnosis was rewritten before the improvement was chosen.
+- **The sweep also missed something, and the re-run caught it.** The sweep counted
+  only attacks labelled `ai` and predicted no change. The real after-run showed four
+  AI-text attacks moving to a confident `human`. That's why both result sets are in
+  this README, not just the prediction.
+
+The held/broke rule (AI text in "unsure" counts as BROKE) and the call to revert the
+improvement were Claude's proposals. I kept both.
+
 <!-- ═══════════════════════ UNIT 8 — THE TEST ═══════════════════════ -->
 
 ---
@@ -1263,14 +1291,64 @@ code; reverting it is two numbers in `detector.py::model_signal`.
 <!-- For each attack still getting through and each criterion still missed:
      what you'd do, and why you stopped. -->
 
+After the improvement, 11 attacks still get through and criterion 2 is still missed.
+They group into four problems:
 
+**1. Short AI text overlaps second-language writing in perplexity.** EV02, EV03, EV04,
+EV06, EV07, EV09, EV10, PI01. The attack set's AI text is about 85 words long, with
+perplexity 33–37, inside my L2 writers' range of 18–41. No setting of signal one
+separates them, and the sweep confirmed it: 0 of 10 labelled AI in every setting.
+- *What I'd do:* make length part of the label mapping. Below about 150 words,
+  return only "unsure": no confident label either way. It wouldn't catch short AI
+  text, but it would stop handing it a confident "human", which is the worse
+  outcome. Beyond that, the real fix is a signal that doesn't measure
+  predictability at all, because predictability is exactly what L2 writing and AI
+  text share.
+- *Why I stopped:* the milestone allowed one change, and I spent it on signal one.
+  The length rule has a cost I haven't measured: short genuine writing, like FP08's
+  "Went for a run. Legs hurt. Worth it." if it were over 20 words, would never get
+  a "human" label.
+
+**2. A handful of surprising tokens swings signal one.** EV01 (typos) and PI02 (fake
+SYSTEM line). Perplexity is an average over every token, so a few rare ones dominate.
+- *What I'd do:* score on a trimmed mean or median of per-token loss in
+  `detector.py::perplexity`, so the most surprising ~10% of tokens can't carry the
+  whole score.
+- *Why I stopped:* one change per milestone. Also untested: second-language writing
+  often has a few unusual word choices too, and trimming them would push those
+  writers toward AI. It has to be measured on criterion 1 before it ships.
+
+**3. EV05, the heavy human edit, I would not fix.** Both signals read it as
+human-written because, by every measure they use, it now is. Text a person has
+rewritten this thoroughly is co-written. Labelling it AI would be the wrong
+accusation this system exists to avoid.
+
+**4. Criterion 2 (gap 0.649 against ≥ 0.75) can't be met by tuning these two signals.**
+Signal two separates AI from human by only 0.492.
+- Under the 50/50 average, even a perfect signal one gives 0.746.
+- Reweighting doesn't rescue it: 0.8 on signal one still only reaches 0.743, and it
+  would push every L2 writer toward signal one's verdict.
+- *What I'd do:* improve signal two's separation first. Its spread and punctuation
+  measures were calibrated on 30 samples.
+- *Why I stopped:* I didn't have a second, unseen sample set to calibrate against,
+  and tuning signal two on the same 30 samples would only make the result look
+  better. The target stays where it is, and the miss stays recorded.
+
+**And the improvement itself.** I'd revert it, as the improvement section says. It
+fixed criterion 2's number on text I tuned against and made the unseen attack set
+worse.
 
 **The trade I'd make if this ran for real:**
 
 <!-- Two sentences. Fewer wrong accusations means more AI text getting through.
      Say which way you'd go and WHO PAYS FOR IT. -->
 
-
+I'd keep the AI threshold high (0.80, with the starter's signal-one curve) and accept
+that most short AI text lands in "unsure" or "human", because a wrong accusation
+falls hardest on second-language writers, the people least able to argue back.
+The cost falls on the honest writers whose work sits next to AI-assisted submissions
+that pass, and on whoever runs the site, who has to treat "unsure" as
+"don't know", not "fine", and use other evidence before acting on anything.
 
 <!-- ═════════════════════════════════════════════════════════════════════
 
