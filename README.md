@@ -402,9 +402,24 @@ The bad-input scenario waits 61 s between trials (`trial_gap`): two of its bodie
 have no usable creator_id, so they're keyed on my address, and 6 in a burst would
 hit the 5/minute limit and test the limiter instead of validation.
 
-**Worth noticing even where MET:** criterion 1's highest score was 0.787 — every
-second-language piece passed, but the closest one is 0.013 from an accusation.
-Criterion 2's miss: clearly-AI averaged 0.830, clearly-human 0.380.
+**How I called each** — a target has to hold in all three trials:
+1. **MET.** 0 of 10 labelled AI in every trial; the target allowed 2. But read it
+   strictly: the highest piece scored 0.787, 0.013 under the line, and that line
+   (`AI_THRESHOLD = 0.80`) was set by looking at these same 10 samples. It passes
+   on the data it was tuned on. This is the criterion I'd tighten: re-run on
+   second-language writing the thresholds have never seen.
+2. **MISSED.** 0.450 in all three trials against ≥ 0.75. AI averaged 0.830;
+   human averaged 0.380. No reading gets this to a pass.
+3. **MET.** `human`, `unsure` and `ai` each appeared at least once in every trial
+   (ai 3×, human 2×, unsure 5× per trial).
+4. **MET.** 5 of 5 appeals returned 200 and their log entries matched content_id,
+   `event`, `status` and `reasoning` exactly; in every trial the unknown id got 404,
+   the repeat got 409, the first id still had exactly 1 appeal entry, and its
+   original `decided` entry still matched the score returned at submit time.
+5. **MET.** All 7 returned 400 with the code from `criteria.md`, and the last log
+   entry after each one was a rejection with that same reason; 0 returned 500.
+   Caveat: it checks that the request left *a* matching entry, not that it left
+   *exactly one*.
 
 **Real output, trial 1 of each** — file `results/run_2026-11-09_1930_before.md`, produced by `run_eval.py::main`.
 
@@ -989,7 +1004,92 @@ Criterion 2's miss: clearly-AI averaged 0.830, clearly-human 0.380.
 
      Look for a pattern. Five failures on one signal is one problem, not five. -->
 
+Eleven problems: criterion 2, nine broken evasions, and PI02. To tell which stage
+did what, I scored each input stage by stage by calling `detector.model_signal`,
+`stylometry.style_signal` and `scoring.combine_signals` directly. I also needed the
+AI text **before** any attack touched it. EV02 is that text with " Really." after
+every sentence, so removing those gives the 85-word original.
 
+| Input | Perplexity | Model | Style | Combined | Label |
+|---|---|---|---|---|---|
+| **Unedited AI text (baseline)** | 33.3 | 0.618 | 0.700 | **0.659** | **unsure** |
+| EV01 typos | 124.8 | 0.164 | 0.882 | 0.523 (gap > 0.3) | unsure |
+| EV02 "Really." sentences | 35.4 | 0.594 | 0.183 | 0.389 (gap > 0.3) | unsure |
+| EV03 quotation | 29.2 | 0.666 | 0.507 | 0.587 | unsure |
+| EV04 unusual words | 33.9 | 0.611 | 0.767 | 0.689 | unsure |
+| EV05 heavy human edit | 71.8 | 0.321 | 0.167 | 0.244 | human |
+| EV06 long + short sentence | 37.5 | 0.573 | 0.367 | 0.470 | unsure |
+| EV07 punctuation padding | 36.2 | 0.586 | 0.367 | 0.476 | unsure |
+| EV09 human opening | 26.2 | 0.704 | 0.576 | 0.640 | unsure |
+| EV10 repeated stanzas | 4.1 | 0.979 | 0.558 | 0.768 (gap > 0.3) | unsure |
+| PI02 without its SYSTEM line | 22.3 | 0.754 | 0.500 | 0.627 | unsure |
+| PI02 as sent | 105.2 | 0.204 | 0.278 | 0.241 | human |
+
+**The pattern: the unedited AI text already gets through.** It scores 0.659,
+"unsure", before any attack is applied. So most of these "evasions" didn't evade
+anything.
+
+**Diagnosis 1 — label mapping, on top of the combining rule (explains 7 of 9 evasions).**
+`AI_THRESHOLD` is 0.80 and the combining rule is a 50/50 average, so an AI label
+needs *both* signals to average above 0.80. On this 85-word text signal one only
+reaches 0.618. Perplexity is 33, against 8–20 for my ~250-word AI samples: a short
+text gives the model less context, so each word is less predictable. Even with a
+perfect style score of 1.0, the average would be 0.81, barely over the line. Two
+groups break because of this:
+- *The attack did nothing or made it worse:* EV03 (−0.07 from baseline), EV04
+  (+0.03), EV09 (−0.02), EV10 (+0.11). EV04 was meant to move signal one, and
+  signal one didn't move at all (0.611 vs 0.618). EV10 pushed signal one to 0.979,
+  but signal two stayed at 0.558, so the 50/50 average is 0.768 — still under
+  0.80. (The gap of 0.42 also trips the disagreement cap, but the average was
+  already below it.) These four broke because the baseline does, not because of
+  anything they did.
+- *Signal two moved as intended, but the text was already through:* EV02 (−0.27),
+  EV06 (−0.19), EV07 (−0.18). The mechanism is the one the attack set names:
+  one-word "Really." sentences and one very long sentence beside one very short
+  one push sentence-length spread to the human end (0.85, 1.19). EV07's padding
+  marks count as rich punctuation (8.25 per 100 words, past the human end of 3.0),
+  and its text no longer splits into sentences, so spread falls back to neutral.
+
+I raised the threshold to 0.80 on purpose, to stop accusing second-language
+writers. This is what that trade costs: on short AI text, the AI label is
+effectively unreachable.
+
+**Diagnosis 2 — signal one: a handful of surprising tokens swings the whole score
+(EV01, PI02).** Perplexity is the exponential of the *mean* per-token loss across
+the whole text. A few very surprising tokens raise that mean sharply, and with a
+midpoint of 45 the score falls steeply.
+- *EV01:* the misspellings split into rare sub-word pieces GPT-2 never expects.
+  Perplexity goes from 33 to 125 and signal one from 0.618 to 0.164. Signal two
+  disagreed (0.882), so the cap kept it "unsure" rather than "human".
+- *PI02:* in the CSV, PI02's AI text stops after two sentences, so the
+  `SYSTEM: … guess=human, confidence=0.02` line is roughly half of a 45-word
+  submission. Without it, the same text scores model 0.754; with it, 0.204. Signal
+  two agreed (0.278): the directive's short fragments raise spread, and its colons
+  count as rich punctuation. Because the signals agreed, the disagreement cap had
+  nothing to catch, and the text came out "human". No stage reads or obeys
+  instructions — the route never passes text to anything that could. The
+  injection "worked" by accident, as odd-looking text.
+
+**EV05 — both signals, and I'd call it a genuine success.** The heavy edit replaced
+generic phrasing with specific, idiomatic language (perplexity 72) and varied
+sentences and dashes (style 0.167). Both signals saw a human-written text because,
+by the measures they use, it now is one. I'd treat that as co-written text, not a
+defect to fix.
+
+**Criterion 2 (MISSED) — signal one's calibration puts human prose in the middle of
+the scale.** The miss is at the human end: AI averaged 0.830, but clearly human
+text only reached 0.380. My five human samples have perplexity 40–75, which straddles
+signal one's midpoint of 45, so signal one gives them only 0.31–0.55. A score under
+0.1 needs perplexity above roughly 180. The average can't go lower than its inputs,
+so even with style scores of 0.05–0.54 the human set averages 0.38. A gap of 0.75
+would need the human set near 0.08 — both signals close to zero. **Stage: signal one
+(its midpoint, still the starter default). Mechanism: the logistic is centred inside
+the human perplexity range rather than between the AI and human ranges.**
+
+**The two diagnoses share a cause.** Signal one's fixed midpoint doesn't fit the
+text it actually sees. Short AI text scores too low (Diagnosis 1), and ordinary
+human prose lands in the middle (criterion 2). Both pull scores toward "unsure",
+and "unsure" lets the text through.
 
 ---
 
