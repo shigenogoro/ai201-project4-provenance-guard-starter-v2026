@@ -224,24 +224,37 @@ I worked through the project with Claude Code as a guide, milestone by milestone
 
 ## Rate Limiting
 
-**My limits:** ___ per minute, ___ per day
+**My limits:** 5 per minute, 60 per day
 
 **Why those numbers and not others:**
 <!-- Think about two people: a real writer submitting their own work a few
      times an hour, and a script sending a thousand variations to map your
      thresholds. Your numbers have to be liveable for the first and hostile to
      the second. -->
+A real writer submits, reads the result, revises, and resubmits — revising takes
+minutes, so 5 a minute leaves room for a double-click or a quick typo fix without
+ever blocking them. Each submission also runs GPT-2 inline on CPU (1–2 s), so the
+per-minute cap keeps one caller from monopolizing the service. But 5/minute alone
+still allows 7,200 a day, so the daily cap does the real work against a script: a
+heavy writer might submit 10–30 times a day, and 60 is double that. A script mapping
+my thresholds with 1,000 variations would need 17 days per creator_id.
 
 **What a caller counts as:** <!-- per address, or per creator_id? They fail
 differently — one script can look like a thousand callers, and one household
 can look like one. -->
+per creator_id, falling back to IP address when none is sent. That keeps a
+classroom or household behind one IP from blocking each other — but creator_id is
+chosen by the caller, so a script that rotates IDs walks straight past the limit.
+Keying on IP would stop that and start blocking shared networks instead. I chose
+not to wrongly block real writers; the cost is that a determined script can get
+through.
 
 **The run of status codes when I pushed past it:**
 
 <!-- python run_attacks.py --flood 15 -->
 
 ```
-
+200 200 200 200 200 429 429 429 429 429 429 429 429 429 429
 ```
 
 ---
