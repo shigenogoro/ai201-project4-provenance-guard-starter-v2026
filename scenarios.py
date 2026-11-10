@@ -1,70 +1,80 @@
 """
 What your test runs. ← UNIT 8, MILESTONE 3
 
-Each of your five criteria needs something run against it. A criterion about
-false positives needs your own writing. One about label coverage needs inputs
-across the score range. One about the appeal path needs a real content_id.
-
-Working that out is Milestone 3's first step, and this file is where you write
-it down. `run_eval.py` runs everything here three times.
-
-Two are filled in as examples. Replace them with what your criteria actually
-need — these are a shape, not a set.
+Each scenario maps to one criterion in `criteria.md`. Texts come from the fixed
+files in `samples/`, chosen before any results (see samples/README.md).
 
 A scenario carries **either** of these:
 
     "texts"   a list of strings. Each is sent as {"text": ..., "creator_id": ...}
               with a creator_id made up for you. Use this for most criteria.
 
-    "bodies"  a list of whole request bodies, sent exactly as written. Use this
-              when the malformed request IS the point — empty text, no `text`
-              field at all, something enormous. A bad-input criterion needs it,
-              because you cannot express "the field is missing" as a string.
+    "bodies"  a list of whole request bodies, sent exactly as written. A dict is
+              sent as JSON; a str is sent raw (for "body is not JSON").
+
+`"appeal": True` makes run_eval.py appeal every content_id that comes back, then
+check the 404 / 409 / original-unchanged cases (criterion 4).
+
+Every request is also checked against the last audit-log entry, so "leaves a
+trace in the log" is measured, not assumed.
 """
+
+from pathlib import Path
+
+SAMPLES = Path(__file__).parent / "samples"
+
+
+def _read(folder: str) -> list[str]:
+    return [p.read_text(encoding="utf-8").strip() for p in sorted((SAMPLES / folder).glob("*.txt"))]
+
 
 SCENARIOS = [
     {
-        "name": "my own writing",
+        "name": "second-language writers",
         "criterion": 1,
-        # ⚠️ PUT YOUR OWN WRITING HERE. Not AI text, not a sample from the web —
-        # things you actually wrote. This is the criterion that matters most and
-        # it's meaningless with someone else's prose.
-        "texts": [
-            "REPLACE ME with a paragraph you wrote yourself.",
-            "REPLACE ME with another one. Ten pieces is the usual number.",
-        ],
+        "texts": _read("human_l2"),
+    },
+    {
+        "name": "AI spread",
+        "criterion": 2,
+        "texts": _read("ai"),
+    },
+    {
+        "name": "human spread",
+        "criterion": 2,
+        "texts": _read("human"),
     },
     {
         "name": "label coverage",
-        "criterion": 2,
-        # Inputs spread across your score range, so you can check all three
-        # labels are actually reachable.
-        "texts": [
-            "REPLACE ME with something you're confident is AI-generated.",
-            "REPLACE ME with something you're confident is human-written.",
-            "REPLACE ME with something genuinely borderline.",
+        "criterion": 3,
+        "texts": _read("coverage"),
+    },
+    {
+        "name": "appeal path",
+        "criterion": 4,
+        "appeal": True,
+        # Five human pieces to submit and then appeal. Reused from criterion 2's
+        # human set: what's under test is the appeal, not the score.
+        "texts": _read("human"),
+    },
+    {
+        "name": "bad input",
+        "criterion": 5,
+        # Bodies 1 and 5 have no usable creator_id, so the limiter keys them on
+        # this machine's address: 2 per trial x 3 trials = 6 > 5/minute. Waiting
+        # out the window between trials keeps this criterion about validation,
+        # not about the rate limit (which Milestone 1 already tests).
+        "trial_gap": 61,
+        "bodies": [
+            '{"text": "not json", "creator_id": "eval_bad_1"',          # 1 invalid_json
+            {"creator_id": "eval_bad_2"},                               # 2 text missing
+            {"text": "", "creator_id": "eval_bad_3"},                   # 3 empty
+            {"text": 123, "creator_id": "eval_bad_4"},                  # 4 number
+            {"text": "This one is just too short."},                    # 5 creator_id missing
+            {"text": "Only five words right here.", "creator_id": "eval_bad_6"},  # 6 too short
+            {"text": "word " * 600, "creator_id": "eval_bad_7"},        # 7 too long
         ],
     },
-    # A bad-input criterion looks like this. Uncomment and adjust if that's one
-    # of your five — these are raw request bodies, sent exactly as written.
-    #
-    # {
-    #     "name": "bad input",
-    #     "criterion": 3,
-    #     "bodies": [
-    #         {"text": "", "creator_id": "eval_bad_empty"},
-    #         {"creator_id": "eval_bad_missing"},          # no text field at all
-    #         {"text": "word " * 50000, "creator_id": "eval_bad_huge"},
-    #         {"text": None, "creator_id": "eval_bad_null"},
-    #     ],
-    # },
-
-    # TODO: add what your remaining criteria need.
-    #
-    # A criterion about the appeal path can't be tested by sending text alone;
-    # it needs a submission first and then an appeal against the content_id
-    # that came back. You'll need to test that one by hand, or extend this file
-    # and run_eval.py to do it. Saying which you did is part of the write-up.
 ]
 
 
@@ -93,9 +103,9 @@ def validate() -> list[str]:
 
         if bodies:
             for j, body in enumerate(bodies, 1):
-                if not isinstance(body, dict):
+                if not isinstance(body, (dict, str)):
                     problems.append(
-                        f"scenario {i}, body {j} is not a dict — bodies are whole "
+                        f"scenario {i}, body {j} is not a dict or str — bodies are whole "
                         f"request bodies, like {{'text': '', 'creator_id': 'x'}}"
                     )
             continue

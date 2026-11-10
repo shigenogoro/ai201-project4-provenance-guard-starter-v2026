@@ -25,6 +25,7 @@ import argparse
 import datetime as dt
 import json
 import sys
+import time
 from pathlib import Path
 
 import config
@@ -112,26 +113,48 @@ def main():
 
         trials = []
         for trial in range(1, args.trials + 1):
+            if trial > 1 and scenario.get("trial_gap"):
+                print(f"  waiting {scenario['trial_gap']}s for the rate-limit window")
+                time.sleep(scenario["trial_gap"])
             results = []
             for i, body in enumerate(bodies_for(scenario), 1):
                 preview = describe(body)
                 try:
-                    response = requests.post(f"{args.url}/submit", json=body,
-                                             timeout=args.timeout)
+                    if isinstance(body, str):  # raw, deliberately not valid JSON
+                        response = requests.post(f"{args.url}/submit", data=body, timeout=args.timeout,
+                                                 headers={"Content-Type": "application/json"})
+                    else:
+                        response = requests.post(f"{args.url}/submit", json=body,
+                                                 timeout=args.timeout)
                     payload = response.json() if response.content else {}
-                    results.append({
+                    result = {
                         "status": response.status_code,
+                        "error": payload.get("error"),
+                        "content_id": payload.get("content_id"),
                         "guess": payload.get("guess"),
                         "confidence": payload.get("confidence"),
                         "model_score": payload.get("model_score"),
                         "style_score": payload.get("style_score"),
                         "label": payload.get("label"),
                         "sent": preview,
-                    })
+                    }
+                    last = last_log_entry(requests, args.url)
+                    # Did THIS request leave its own trace? Decisions match on
+                    # content_id, rejections on the reason code.
+                    result["logged"] = (
+                        last.get("content_id") == payload.get("content_id")
+                        if response.status_code == 200
+                        else last.get("reason") == payload.get("error")
+                    )
+                    if scenario.get("appeal") and response.status_code == 200:
+                        result.update(appeal(requests, args.url, payload))
+                    results.append(result)
                 except Exception as exc:  # noqa: BLE001
                     results.append({"status": None, "error": f"{type(exc).__name__}: {exc}",
                                     "sent": preview})
 
+            if scenario.get("appeal"):
+                results.append(appeal_edge_cases(requests, args.url, results))
             trials.append(results)
             guesses = [r.get("guess") or "—" for r in results]
             print(f"  trial {trial}: {', '.join(guesses)}")
@@ -139,6 +162,53 @@ def main():
         rows.append({"scenario": scenario, "trials": trials})
 
     write_report(rows, args)
+
+
+def last_log_entry(requests, url):
+    entries = requests.get(f"{url}/log", params={"limit": 1}, timeout=10).json()["entries"]
+    return entries[-1] if entries else {}
+
+
+APPEAL_REASONING = "I wrote this myself. I drafted it by hand first, then typed and revised it."
+
+
+def appeal(requests, url, submitted):
+    """Criterion 4: appeal one decision and check the log recorded it exactly."""
+    r = requests.post(f"{url}/appeal", timeout=10,
+                      json={"content_id": submitted["content_id"], "reasoning": APPEAL_REASONING})
+    last = last_log_entry(requests, url)
+    return {
+        "appeal_status": r.status_code,
+        "appeal_response_status": r.json().get("status"),
+        "appeal_logged": (last.get("content_id") == submitted["content_id"]
+                          and last.get("event") == "appeal"
+                          and last.get("status") == "under_review"
+                          and last.get("reasoning") == APPEAL_REASONING),
+    }
+
+
+def appeal_edge_cases(requests, url, results):
+    """Criterion 4: unknown id -> 404, second appeal -> 409, original decision untouched."""
+    first = next((r for r in results if r.get("content_id")), None)
+    if first is None:
+        return {"check": "edge cases", "error": "no content_id came back to appeal"}
+
+    missing = requests.post(f"{url}/appeal", timeout=10,
+                            json={"content_id": "does-not-exist", "reasoning": APPEAL_REASONING})
+    again = requests.post(f"{url}/appeal", timeout=10,
+                          json={"content_id": first["content_id"], "reasoning": APPEAL_REASONING})
+    entries = [e for e in requests.get(f"{url}/log", timeout=10).json()["entries"]
+               if e.get("content_id") == first["content_id"]]
+    decided = [e for e in entries if e.get("status") == "decided"]
+    return {
+        "check": "edge cases",
+        "unknown_id_status": missing.status_code,
+        "second_appeal_status": again.status_code,
+        "appeal_entries_for_first_id": sum(e.get("event") == "appeal" for e in entries),
+        "original_unchanged": (len(decided) == 1
+                               and decided[0].get("guess") == first["guess"]
+                               and decided[0].get("combined_score") == first["confidence"]),
+    }
 
 
 def write_report(rows, args):

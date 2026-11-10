@@ -379,17 +379,598 @@ behind one fake line.
 
 | Criterion | Target | Run 1 | Run 2 | Run 3 | Verdict |
 |---|---|---|---|---|---|
-| 1.  |  |  |  |  |  |
-| 2.  |  |  |  |  |  |
-| 3.  |  |  |  |  |  |
-| 4.  |  |  |  |  |  |
-| 5.  |  |  |  |  |  |
+| 1. Second-language writers labelled high-confidence AI | ≤ 2 of 10 | 0/10 | 0/10 | 0/10 | MET |
+| 2. Mean confidence, clearly-AI minus clearly-human | ≥ 0.75 | 0.450 | 0.450 | 0.450 | MISSED |
+| 3. All three labels reachable | 3 of 3 | 3/3 | 3/3 | 3/3 | MET |
+| 4. Appeal recorded and moves to under_review (+ 404 / 409 / original unchanged) | 5 of 5 + 3 checks | 5/5 + 3/3 | 5/5 + 3/3 | 5/5 + 3/3 | MET |
+| 5. Bad input returns 400 with the right code and a log entry, never 500 | 7 of 7 | 7/7 | 7/7 | 7/7 | MET |
 
-**Real output from one trial**, pasted as text, naming the file and function
-that produced it:
+Run: `python run_eval.py --label before` → `results/run_2026-11-09_1930_before.md`. All three trials returned
+identical scores, as expected — nothing in either signal is random.
+
+**How each was measured.** `scenarios.py` reads the fixed files in `samples/`
+(criteria 1–3, 5 bodies for criterion 5). I extended `run_eval.py` in three ways
+rather than testing by hand:
+- after every request it reads the last audit-log entry and records `logged`:
+  does that entry match this request's `content_id` (decision) or `error` (rejection)?
+- an `"appeal": True` scenario appeals every `content_id` that comes back
+  (`run_eval.py::appeal`), then checks an unknown id, a second appeal, and that the
+  original `decided` entry is unchanged (`run_eval.py::appeal_edge_cases`);
+- a `str` in `bodies` is sent raw, so "body is not JSON" is testable.
+
+The bad-input scenario waits 61 s between trials (`trial_gap`): two of its bodies
+have no usable creator_id, so they're keyed on my address, and 6 in a burst would
+hit the 5/minute limit and test the limiter instead of validation.
+
+**Worth noticing even where MET:** criterion 1's highest score was 0.787 — every
+second-language piece passed, but the closest one is 0.013 from an accusation.
+Criterion 2's miss: clearly-AI averaged 0.830, clearly-human 0.380.
+
+**Real output, trial 1 of each** — file `results/run_2026-11-09_1930_before.md`, produced by `run_eval.py::main`.
+
+*Criterion 1 — second-language writers* (`run_eval.py::main`)
 
 ```json
+[
+  {
+    "status": 200,
+    "error": null,
+    "content_id": "7a370a8b-6f4c-4b24-8388-2fc7f30f5bb4",
+    "guess": "unsure",
+    "confidence": 0.7226,
+    "model_score": 0.7179,
+    "style_score": 0.7272,
+    "label": "We couldn't tell whether this was written by a person or with AI. This is not an accusation, and it says nothing about the quality of your writing — a lot of people's own work lands here. You don't need to do anything.",
+    "sent": "First of all, the reading mentions that the ancient Greeks were not te",
+    "logged": true
+  },
+  {
+    "status": 200,
+    "error": null,
+    "content_id": "7be9bf2d-0ac3-4ea5-8802-7cb3a9d58b71",
+    "guess": "unsure",
+    "confidence": 0.7218,
+    "model_score": 0.6957,
+    "style_score": 0.7478,
+    "label": "We couldn't tell whether this was written by a person or with AI. This is not an accusation, and it says nothing about the quality of your writing — a lot of people's own work lands here. You don't need to do anything.",
+    "sent": "Secondly, the passage indicates that the burning mirror would take a l",
+    "logged": true
+  },
+  {
+    "status": 200,
+    "error": null,
+    "content_id": "acef4857-5346-441c-a1ab-8f65f0437fbd",
+    "guess": "unsure",
+    "confidence": 0.7607,
+    "model_score": 0.7213,
+    "style_score": 0.8,
+    "label": "We couldn't tell whether this was written by a person or with AI. This is not an accusation, and it says nothing about the quality of your writing — a lot of people's own work lands here. You don't need to do anything.",
+    "sent": "Last but not least, the article implies that the burning mirror does n",
+    "logged": true
+  },
+  {
+    "status": 200,
+    "error": null,
+    "content_id": "ce89077a-3f34-461f-8266-dbab87042d00",
+    "guess": "unsure",
+    "confidence": 0.594,
+    "model_score": 0.5343,
+    "style_score": 0.6538,
+    "label": "We couldn't tell whether this was written by a person or with AI. This is not an accusation, and it says nothing about the quality of your writing — a lot of people's own work lands here. You don't need to do anything.",
+    "sent": "First of all, people like to have a good quality relationship, and spe",
+    "logged": true
+  },
+  {
+    "status": 200,
+    "error": null,
+    "content_id": "ca65f247-295f-4730-94f4-0c63b52f6554",
+    "guess": "unsure",
+    "confidence": 0.7513,
+    "model_score": 0.6823,
+    "style_score": 0.8204,
+    "label": "We couldn't tell whether this was written by a person or with AI. This is not an accusation, and it says nothing about the quality of your writing — a lot of people's own work lands here. You don't need to do anything.",
+    "sent": "Secondly, people should care about their mental health, and spending m",
+    "logged": true
+  },
+  {
+    "status": 200,
+    "error": null,
+    "content_id": "ffc3c7f6-ca25-4c1a-a78d-4f734fea0468",
+    "guess": "unsure",
+    "confidence": 0.6034,
+    "model_score": 0.6259,
+    "style_score": 0.5808,
+    "label": "We couldn't tell whether this was written by a person or with AI. This is not an accusation, and it says nothing about the quality of your writing — a lot of people's own work lands here. You don't need to do anything.",
+    "sent": "Last but not least, people care about having their own time, and spend",
+    "logged": true
+  },
+  {
+    "status": 200,
+    "error": null,
+    "content_id": "5b460249-363b-4664-9ce7-6e0b48fd1497",
+    "guess": "unsure",
+    "confidence": 0.757,
+    "model_score": 0.8063,
+    "style_score": 0.7077,
+    "label": "We couldn't tell whether this was written by a person or with AI. This is not an accusation, and it says nothing about the quality of your writing — a lot of people's own work lands here. You don't need to do anything.",
+    "sent": "First of all, universities and colleges care about students’ future, a",
+    "logged": true
+  },
+  {
+    "status": 200,
+    "error": null,
+    "content_id": "b15c00f7-b75b-4ee4-922d-33556236f3d2",
+    "guess": "unsure",
+    "confidence": 0.7872,
+    "model_score": 0.6911,
+    "style_score": 0.8833,
+    "label": "We couldn't tell whether this was written by a person or with AI. This is not an accusation, and it says nothing about the quality of your writing — a lot of people's own work lands here. You don't need to do anything.",
+    "sent": "Secondly, colleges and universities put emphasis on their reputation, ",
+    "logged": true
+  },
+  {
+    "status": 200,
+    "error": null,
+    "content_id": "436f9741-63ae-412c-a264-e73cb6f458a7",
+    "guess": "unsure",
+    "confidence": 0.6758,
+    "model_score": 0.6831,
+    "style_score": 0.6684,
+    "label": "We couldn't tell whether this was written by a person or with AI. This is not an accusation, and it says nothing about the quality of your writing — a lot of people's own work lands here. You don't need to do anything.",
+    "sent": "Lastly, colleges and universities want to earn more money, and encoura",
+    "logged": true
+  },
+  {
+    "status": 200,
+    "error": null,
+    "content_id": "a867155e-af35-4906-9430-fc2e7aad39be",
+    "guess": "unsure",
+    "confidence": 0.6771,
+    "model_score": 0.7679,
+    "style_score": 0.5862,
+    "label": "We couldn't tell whether this was written by a person or with AI. This is not an accusation, and it says nothing about the quality of your writing — a lot of people's own work lands here. You don't need to do anything.",
+    "sent": "First of all, it is important to consider people’s safety when they go",
+    "logged": true
+  }
+]
+```
 
+*Criterion 2 — score spread* (`run_eval.py::main`)
+
+```json
+{
+  "AI spread": [
+    {
+      "status": 200,
+      "error": null,
+      "content_id": "ee3e7cfa-fb78-4a86-9607-f48072d7dc55",
+      "guess": "unsure",
+      "confidence": 0.7124,
+      "model_score": 0.7834,
+      "style_score": 0.6414,
+      "label": "We couldn't tell whether this was written by a person or with AI. This is not an accusation, and it says nothing about the quality of your writing — a lot of people's own work lands here. You don't need to do anything.",
+      "sent": "Remote work has transformed the way organizations operate in the moder",
+      "logged": true
+    },
+    {
+      "status": 200,
+      "error": null,
+      "content_id": "df1116ac-af4b-4f44-89af-8a685c7d62d6",
+      "guess": "ai",
+      "confidence": 0.8102,
+      "model_score": 0.8293,
+      "style_score": 0.791,
+      "label": "We think this was probably written with AI. Our check can be wrong, especially with plain or simple writing. If you wrote this yourself, you can appeal: tell us in your own words how you wrote it — for example, where the idea came from or what drafts you made. A person, not the computer, will review your appeal.",
+      "sent": "Reading is one of the most valuable habits a person can develop. It ex",
+      "logged": true
+    },
+    {
+      "status": 200,
+      "error": null,
+      "content_id": "b7128394-ba17-47d2-a169-ff3b14b5f532",
+      "guess": "ai",
+      "confidence": 0.8816,
+      "model_score": 0.9337,
+      "style_score": 0.8295,
+      "label": "We think this was probably written with AI. Our check can be wrong, especially with plain or simple writing. If you wrote this yourself, you can appeal: tell us in your own words how you wrote it — for example, where the idea came from or what drafts you made. A person, not the computer, will review your appeal.",
+      "sent": "Climate change is one of the most pressing issues facing humanity toda",
+      "logged": true
+    },
+    {
+      "status": 200,
+      "error": null,
+      "content_id": "5568e1b3-55de-4b5a-8ebd-7a51eb0f4606",
+      "guess": "ai",
+      "confidence": 0.8917,
+      "model_score": 0.93,
+      "style_score": 0.8534,
+      "label": "We think this was probably written with AI. Our check can be wrong, especially with plain or simple writing. If you wrote this yourself, you can appeal: tell us in your own words how you wrote it — for example, where the idea came from or what drafts you made. A person, not the computer, will review your appeal.",
+      "sent": "Regular exercise is essential for maintaining both physical and mental",
+      "logged": true
+    },
+    {
+      "status": 200,
+      "error": null,
+      "content_id": "ccfdfbd8-99d3-4796-b40c-8b7107d1f234",
+      "guess": "ai",
+      "confidence": 0.8534,
+      "model_score": 0.8454,
+      "style_score": 0.8614,
+      "label": "We think this was probably written with AI. Our check can be wrong, especially with plain or simple writing. If you wrote this yourself, you can appeal: tell us in your own words how you wrote it — for example, where the idea came from or what drafts you made. A person, not the computer, will review your appeal.",
+      "sent": "Technology has significantly changed the landscape of education in rec",
+      "logged": true
+    }
+  ],
+  "human spread": [
+    {
+      "status": 200,
+      "error": null,
+      "content_id": "ee7578b2-6ed2-408d-a240-f40f70ab2d9e",
+      "guess": "human",
+      "confidence": 0.2854,
+      "model_score": 0.3062,
+      "style_score": 0.2646,
+      "label": "We think this was probably written by a person.",
+      "sent": "The whistle of the locomotive penetrates my woods summer and winter, s",
+      "logged": true
+    },
+    {
+      "status": 200,
+      "error": null,
+      "content_id": "e33f6c59-2fee-4164-9de7-51ad0297acb0",
+      "guess": "unsure",
+      "confidence": 0.4924,
+      "model_score": 0.4477,
+      "style_score": 0.5372,
+      "label": "We couldn't tell whether this was written by a person or with AI. This is not an accusation, and it says nothing about the quality of your writing — a lot of people's own work lands here. You don't need to do anything.",
+      "sent": "I had three chairs in my house; one for solitude, two for friendship, ",
+      "logged": true
+    },
+    {
+      "status": 200,
+      "error": null,
+      "content_id": "4f7752a9-a821-47e9-8069-1330da42168e",
+      "guess": "unsure",
+      "confidence": 0.4236,
+      "model_score": 0.4632,
+      "style_score": 0.384,
+      "label": "We couldn't tell whether this was written by a person or with AI. This is not an accusation, and it says nothing about the quality of your writing — a lot of people's own work lands here. You don't need to do anything.",
+      "sent": "It was six o'clock on a hot summer morning. The 'Pennsylvania' was cre",
+      "logged": true
+    },
+    {
+      "status": 200,
+      "error": null,
+      "content_id": "3f67254e-8bf1-44ba-8025-6b2f183da0a2",
+      "guess": "human",
+      "confidence": 0.2834,
+      "model_score": 0.5168,
+      "style_score": 0.05,
+      "label": "We think this was probably written by a person.",
+      "sent": "The Town of Grand Tower was evidently a busier place than it had been ",
+      "logged": true
+    },
+    {
+      "status": 200,
+      "error": null,
+      "content_id": "f70d9782-ba1c-4785-80b9-53182c822eb3",
+      "guess": "unsure",
+      "confidence": 0.4144,
+      "model_score": 0.5471,
+      "style_score": 0.2818,
+      "label": "We couldn't tell whether this was written by a person or with AI. This is not an accusation, and it says nothing about the quality of your writing — a lot of people's own work lands here. You don't need to do anything.",
+      "sent": "Harris, however, said he had done enough for a bit, and proposed that ",
+      "logged": true
+    }
+  ]
+}
+```
+
+*Criterion 3 — label coverage* (`run_eval.py::main`)
+
+```json
+[
+  {
+    "status": 200,
+    "error": null,
+    "content_id": "5c0cbf27-9ecd-483c-9faf-13def2cde3e1",
+    "guess": "unsure",
+    "confidence": 0.753,
+    "model_score": 0.754,
+    "style_score": 0.752,
+    "label": "We couldn't tell whether this was written by a person or with AI. This is not an accusation, and it says nothing about the quality of your writing — a lot of people's own work lands here. You don't need to do anything.",
+    "sent": "Friendship is a fundamental aspect of the human experience. True frien",
+    "logged": true
+  },
+  {
+    "status": 200,
+    "error": null,
+    "content_id": "7c892fec-81fd-472e-8a7d-15786108795e",
+    "guess": "unsure",
+    "confidence": 0.7885,
+    "model_score": 0.8239,
+    "style_score": 0.7531,
+    "label": "We couldn't tell whether this was written by a person or with AI. This is not an accusation, and it says nothing about the quality of your writing — a lot of people's own work lands here. You don't need to do anything.",
+    "sent": "Effective time management is a crucial skill for success in both perso",
+    "logged": true
+  },
+  {
+    "status": 200,
+    "error": null,
+    "content_id": "2c83cf30-dff9-424b-a53b-c6e15396c706",
+    "guess": "unsure",
+    "confidence": 0.7519,
+    "model_score": 0.8041,
+    "style_score": 0.6996,
+    "label": "We couldn't tell whether this was written by a person or with AI. This is not an accusation, and it says nothing about the quality of your writing — a lot of people's own work lands here. You don't need to do anything.",
+    "sent": "Traveling offers numerous benefits that extend far beyond simple relax",
+    "logged": true
+  },
+  {
+    "status": 200,
+    "error": null,
+    "content_id": "7364e4ad-0516-44c3-a64c-31d6e36f4adc",
+    "guess": "ai",
+    "confidence": 0.8218,
+    "model_score": 0.8563,
+    "style_score": 0.7874,
+    "label": "We think this was probably written with AI. Our check can be wrong, especially with plain or simple writing. If you wrote this yourself, you can appeal: tell us in your own words how you wrote it — for example, where the idea came from or what drafts you made. A person, not the computer, will review your appeal.",
+    "sent": "Social media has become an integral part of modern life, shaping the w",
+    "logged": true
+  },
+  {
+    "status": 200,
+    "error": null,
+    "content_id": "c39b6aec-c66c-436a-86b7-00acfbbe82b8",
+    "guess": "ai",
+    "confidence": 0.8569,
+    "model_score": 0.8477,
+    "style_score": 0.8662,
+    "label": "We think this was probably written with AI. Our check can be wrong, especially with plain or simple writing. If you wrote this yourself, you can appeal: tell us in your own words how you wrote it — for example, where the idea came from or what drafts you made. A person, not the computer, will review your appeal.",
+    "sent": "Having a hobby is an important part of living a balanced and fulfillin",
+    "logged": true
+  },
+  {
+    "status": 200,
+    "error": null,
+    "content_id": "465c4c4c-570f-45ea-8312-8aeac99a36c1",
+    "guess": "ai",
+    "confidence": 0.8436,
+    "model_score": 0.7858,
+    "style_score": 0.9014,
+    "label": "We think this was probably written with AI. Our check can be wrong, especially with plain or simple writing. If you wrote this yourself, you can appeal: tell us in your own words how you wrote it — for example, where the idea came from or what drafts you made. A person, not the computer, will review your appeal.",
+    "sent": "Participating in team sports offers many benefits for young people. Te",
+    "logged": true
+  },
+  {
+    "status": 200,
+    "error": null,
+    "content_id": "f08972c0-9747-44e9-9643-8367294d24ad",
+    "guess": "unsure",
+    "confidence": 0.529,
+    "model_score": 0.7413,
+    "style_score": 0.3167,
+    "label": "We couldn't tell whether this was written by a person or with AI. This is not an accusation, and it says nothing about the quality of your writing — a lot of people's own work lands here. You don't need to do anything.",
+    "sent": "Rather an amusing thing happened while dressing that morning. I was ve",
+    "logged": true
+  },
+  {
+    "status": 200,
+    "error": null,
+    "content_id": "d344a96b-a0be-41b5-81bf-2b981a5714a0",
+    "guess": "human",
+    "confidence": 0.3437,
+    "model_score": 0.5491,
+    "style_score": 0.1382,
+    "label": "We think this was probably written by a person.",
+    "sent": "Then he tossed the marble away pettishly, and stood cogitating. The tr",
+    "logged": true
+  },
+  {
+    "status": 200,
+    "error": null,
+    "content_id": "367b4761-2b70-4e54-a8e6-f2324f09179a",
+    "guess": "human",
+    "confidence": 0.1998,
+    "model_score": 0.3497,
+    "style_score": 0.05,
+    "label": "We think this was probably written by a person.",
+    "sent": "Everything in camp was drenched, the campfire as well; for they were b",
+    "logged": true
+  },
+  {
+    "status": 200,
+    "error": null,
+    "content_id": "e7ca1aec-211e-403e-8ef0-c6ed2b88f4e6",
+    "guess": "unsure",
+    "confidence": 0.6604,
+    "model_score": 0.7382,
+    "style_score": 0.5826,
+    "label": "We couldn't tell whether this was written by a person or with AI. This is not an accusation, and it says nothing about the quality of your writing — a lot of people's own work lands here. You don't need to do anything.",
+    "sent": "“He didn’t mind me; in fact, he took a fancy to me, for at the time wh",
+    "logged": true
+  }
+]
+```
+
+*Criterion 4 — appeal path* (`run_eval.py::appeal`, last item from `run_eval.py::appeal_edge_cases`)
+
+```json
+[
+  {
+    "status": 200,
+    "error": null,
+    "content_id": "aea3bfbf-bb1b-40f5-b4df-6c43c09ebe82",
+    "guess": "human",
+    "confidence": 0.2854,
+    "model_score": 0.3062,
+    "style_score": 0.2646,
+    "label": "We think this was probably written by a person.",
+    "sent": "The whistle of the locomotive penetrates my woods summer and winter, s",
+    "logged": true,
+    "appeal_status": 200,
+    "appeal_response_status": "under_review",
+    "appeal_logged": true
+  },
+  {
+    "status": 200,
+    "error": null,
+    "content_id": "4833a367-4ffd-41f6-99a5-a447315dc2c5",
+    "guess": "unsure",
+    "confidence": 0.4924,
+    "model_score": 0.4477,
+    "style_score": 0.5372,
+    "label": "We couldn't tell whether this was written by a person or with AI. This is not an accusation, and it says nothing about the quality of your writing — a lot of people's own work lands here. You don't need to do anything.",
+    "sent": "I had three chairs in my house; one for solitude, two for friendship, ",
+    "logged": true,
+    "appeal_status": 200,
+    "appeal_response_status": "under_review",
+    "appeal_logged": true
+  },
+  {
+    "status": 200,
+    "error": null,
+    "content_id": "f23d423e-3f48-496c-9bef-53d4d23b65d2",
+    "guess": "unsure",
+    "confidence": 0.4236,
+    "model_score": 0.4632,
+    "style_score": 0.384,
+    "label": "We couldn't tell whether this was written by a person or with AI. This is not an accusation, and it says nothing about the quality of your writing — a lot of people's own work lands here. You don't need to do anything.",
+    "sent": "It was six o'clock on a hot summer morning. The 'Pennsylvania' was cre",
+    "logged": true,
+    "appeal_status": 200,
+    "appeal_response_status": "under_review",
+    "appeal_logged": true
+  },
+  {
+    "status": 200,
+    "error": null,
+    "content_id": "ec8eb8ef-e259-4789-8342-7e955843dee8",
+    "guess": "human",
+    "confidence": 0.2834,
+    "model_score": 0.5168,
+    "style_score": 0.05,
+    "label": "We think this was probably written by a person.",
+    "sent": "The Town of Grand Tower was evidently a busier place than it had been ",
+    "logged": true,
+    "appeal_status": 200,
+    "appeal_response_status": "under_review",
+    "appeal_logged": true
+  },
+  {
+    "status": 200,
+    "error": null,
+    "content_id": "6c4fd897-b755-4ac9-b686-85192e60aa67",
+    "guess": "unsure",
+    "confidence": 0.4144,
+    "model_score": 0.5471,
+    "style_score": 0.2818,
+    "label": "We couldn't tell whether this was written by a person or with AI. This is not an accusation, and it says nothing about the quality of your writing — a lot of people's own work lands here. You don't need to do anything.",
+    "sent": "Harris, however, said he had done enough for a bit, and proposed that ",
+    "logged": true,
+    "appeal_status": 200,
+    "appeal_response_status": "under_review",
+    "appeal_logged": true
+  },
+  {
+    "check": "edge cases",
+    "unknown_id_status": 404,
+    "second_appeal_status": 409,
+    "appeal_entries_for_first_id": 1,
+    "original_unchanged": true
+  }
+]
+```
+
+*Criterion 5 — bad input* (`run_eval.py::main`)
+
+```json
+[
+  {
+    "status": 400,
+    "error": "invalid_json",
+    "content_id": null,
+    "guess": null,
+    "confidence": null,
+    "model_score": null,
+    "style_score": null,
+    "label": null,
+    "sent": "\"{\\\"text\\\": \\\"not json\\\", \\\"creator_id\\\": \\\"eval_bad_1\\\"\"",
+    "logged": true
+  },
+  {
+    "status": 400,
+    "error": "missing_field",
+    "content_id": null,
+    "guess": null,
+    "confidence": null,
+    "model_score": null,
+    "style_score": null,
+    "label": null,
+    "sent": "{\"creator_id\": \"eval_bad_2\"}",
+    "logged": true
+  },
+  {
+    "status": 400,
+    "error": "missing_field",
+    "content_id": null,
+    "guess": null,
+    "confidence": null,
+    "model_score": null,
+    "style_score": null,
+    "label": null,
+    "sent": "(empty text)",
+    "logged": true
+  },
+  {
+    "status": 400,
+    "error": "missing_field",
+    "content_id": null,
+    "guess": null,
+    "confidence": null,
+    "model_score": null,
+    "style_score": null,
+    "label": null,
+    "sent": "{\"text\": 123, \"creator_id\": \"eval_bad_4\"}",
+    "logged": true
+  },
+  {
+    "status": 400,
+    "error": "missing_field",
+    "content_id": null,
+    "guess": null,
+    "confidence": null,
+    "model_score": null,
+    "style_score": null,
+    "label": null,
+    "sent": "{\"text\": \"This one is just too short.\"}",
+    "logged": true
+  },
+  {
+    "status": 400,
+    "error": "text_too_short",
+    "content_id": null,
+    "guess": null,
+    "confidence": null,
+    "model_score": null,
+    "style_score": null,
+    "label": null,
+    "sent": "Only five words right here.",
+    "logged": true
+  },
+  {
+    "status": 400,
+    "error": "text_too_long",
+    "content_id": null,
+    "guess": null,
+    "confidence": null,
+    "model_score": null,
+    "style_score": null,
+    "label": null,
+    "sent": "word word word word word word word word word word word word word word ",
+    "logged": true
+  }
+]
 ```
 
 **Diagnoses**
