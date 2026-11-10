@@ -60,7 +60,7 @@ Provenance Guard is a small backend a writing site can plug into. Text comes in;
 
 ### Signal one — the model signal
 
-**What it measures:** how predictable the text is to GPT-2, run locally (`detector.py::model_signal`). Perplexity is squashed onto 0–1 with a logistic (midpoint 45, steepness 1.6, starter defaults, unchanged). Higher = more AI-like.
+**What it measures:** how predictable the text is to GPT-2, run locally (`detector.py::model_signal`). Perplexity is squashed onto 0–1 with a logistic (midpoint 28, steepness 4 — changed in unit 8 from the starter's 45 / 1.6; see **The Improvement**). Higher = more AI-like.
 
 **Why that might differ between human and AI writing:** AI picks each next word from a probability distribution, favouring likely words, so another language model finds the result easy to predict. People choose words for what they mean, which produces more surprising choices.
 
@@ -1127,22 +1127,134 @@ itself, not in the scale.
 
 ## The Improvement
 
-**What I changed:**
+**What I changed:** one thing, in one stage: signal one's perplexity-to-score curve
+in `detector.py::model_signal`. The midpoint moved from **45 → 28** and the steepness
+from **1.6 → 4**. Weights, thresholds, signal two and the route are unchanged.
 
-**Which diagnosis pointed at it:**
+**Which diagnosis pointed at it:** the criterion 2 diagnosis. Signal one's midpoint
+(45) sat inside the human perplexity range (40–75), and the curve was gentle, so
+plain human prose scored 0.31–0.55. The sweep in
+`results/signal_one_sweep_2026-11-09.md` predicted that 28 / 4 would widen the gap
+to 0.649 with no new L2 or false-positive accusations. Diagnosis 1 also said this
+couldn't fix the evasions, because short AI text overlaps L2 writing in perplexity.
 
 ### Attack Run — After
 
-<!-- Same format. `run_attacks.py --label after` -->
+Run: `python run_attacks.py --set attack_set --label after` →
+`results/attack_run_2026-11-09_1944_after.md`. Same marking rules as before. For
+prompt injection, "got what it asked for" means an injection wrapped around AI text
+(PI01, PI02, PI03, PI05) came back `human`. Every malformed and flood row returned
+the same status as before.
 
+| ID | Family | Before | After | Model before → after | Verdict before | Verdict after | Note |
+|---|---|---|---|---|---|---|---|
+| EV01 | evasion | 200 unsure 0.523 | 200 unsure 0.442 | 0.164 → 0.003 | BROKE | **BROKE** |  |
+| EV02 | evasion | 200 unsure 0.389 | 200 human 0.232 | 0.594 → 0.280 | BROKE | **BROKE** | unsure → human |
+| EV03 | evasion | 200 unsure 0.587 | 200 unsure 0.482 | 0.666 → 0.458 | BROKE | **BROKE** |  |
+| EV04 | evasion | 200 unsure 0.689 | 200 unsure 0.542 | 0.611 → 0.318 | BROKE | **BROKE** |  |
+| EV05 | evasion | 200 human 0.244 | 200 human 0.095 | 0.321 → 0.023 | BROKE | **BROKE** |  |
+| EV06 | evasion | 200 unsure 0.470 | 200 human 0.302 | 0.573 → 0.238 | BROKE | **BROKE** | unsure → human |
+| EV07 | evasion | 200 unsure 0.476 | 200 human 0.315 | 0.586 → 0.264 | BROKE | **BROKE** | unsure → human |
+| EV08 | evasion | 400 | 400 | — → — | HELD | **HELD** |  |
+| EV09 | evasion | 200 unsure 0.640 | 200 unsure 0.571 | 0.704 → 0.567 | BROKE | **BROKE** |  |
+| EV10 | evasion | 200 unsure 0.768 | 200 unsure 0.779 | 0.979 → 1.000 | BROKE | **BROKE** | still 0.02 under the AI line |
+| FP01 | false_positive | 200 unsure 0.615 | 200 unsure 0.472 | 0.618 → 0.332 | HELD | **HELD** |  |
+| FP02 | false_positive | 200 unsure 0.761 | 200 unsure 0.726 | 0.739 → 0.668 | HELD | **HELD** |  |
+| FP03 | false_positive | 200 unsure 0.772 | 200 unsure 0.789 | 0.805 → 0.839 | HELD | **HELD** | 0.011 from an accusation |
+| FP04 | false_positive | 200 unsure 0.762 | 200 unsure 0.792 | 0.833 → 0.893 | HELD | **HELD** | 0.008 from an accusation |
+| FP05 | false_positive | 200 unsure 0.752 | 200 unsure 0.766 | 0.800 → 0.829 | HELD | **HELD** |  |
+| FP06 | false_positive | 200 unsure 0.666 | 200 unsure 0.704 | 0.881 → 0.958 | HELD | **HELD** |  |
+| FP07 | false_positive | 200 unsure 0.591 | 200 unsure 0.629 | 0.882 → 0.958 | HELD | **HELD** |  |
+| FP08 | false_positive | 400 | 400 | — → — | HELD | **HELD** |  |
+| PI01 | prompt_injection | 200 unsure 0.481 | 200 human 0.297 | 0.463 → 0.093 | HELD | **BROKE** | unsure → human: newly broken |
+| PI02 | prompt_injection | 200 human 0.241 | 200 human 0.141 | 0.204 → 0.005 | BROKE | **BROKE** |  |
+| PI03 | prompt_injection | 200 unsure 0.558 | 200 unsure 0.401 | 0.594 → 0.280 | HELD | **HELD** |  |
+| PI04 | prompt_injection | 200 unsure 0.458 | 200 human 0.274 | 0.500 → 0.130 | HELD | **HELD** |  |
+| PI05 | prompt_injection | 200 unsure 0.500 | 200 unsure 0.374 | 0.640 → 0.388 | HELD | **HELD** |  |
+| PI06 | prompt_injection | 200 unsure 0.592 | 200 unsure 0.419 | 0.558 → 0.212 | HELD | **HELD** |  |
+| MF01 | malformed | 400 | 400 | — → — | HELD | **HELD** |  |
+| MF02 | malformed | 400 | 400 | — → — | HELD | **HELD** |  |
+| MF03 | malformed | 400 | 400 | — → — | HELD | **HELD** |  |
+| MF04 | malformed | 400 | 400 | — → — | HELD | **HELD** |  |
+| MF05 | malformed | 400 | 400 | — → — | HELD | **HELD** |  |
+| MF06 | malformed | 400 | 400 | — → — | HELD | **HELD** |  |
+| MF07 | malformed | 400 | 400 | — → — | HELD | **HELD** |  |
+| MF08 | malformed | 400 | 400 | — → — | HELD | **HELD** |  |
+| RQ01 | malformed | 400 | 400 | — → — | HELD | **HELD** |  |
+| RQ02 | malformed | 400 | 400 | — → — | HELD | **HELD** |  |
+| RQ03 | malformed | 400 | 400 | — → — | HELD | **HELD** |  |
+| RQ04 | malformed | 400 | 400 | — → — | HELD | **HELD** |  |
+| RQ05 | malformed | 400 | 400 | — → — | HELD | **HELD** |  |
+| RQ06 | malformed | 400 | 400 | — → — | HELD | **HELD** |  |
+| RQ07 | malformed | 400 | 400 | — → — | HELD | **HELD** |  |
+| RQ08 | malformed | 400 | 400 | — → — | HELD | **HELD** |  |
+| RQ09 | malformed | 400 | 400 | — → — | HELD | **HELD** |  |
+| RQ10 | malformed | 429 | 429 | — → — | HELD | **HELD** | 429 (shared IP key), as before |
+| RQ11 | malformed | 429 | 429 | — → — | HELD | **HELD** | 429 (shared IP key), as before |
+| RQ12 | malformed | 400 | 400 | — → — | HELD | **HELD** |  |
+| FL01_01 | flood_same_creator | 400 | 400 | — → — | HELD | **HELD** |  |
+| FL01_02 | flood_same_creator | 400 | 400 | — → — | HELD | **HELD** |  |
+| FL01_03 | flood_same_creator | 400 | 400 | — → — | HELD | **HELD** |  |
+| FL01_04 | flood_same_creator | 400 | 400 | — → — | HELD | **HELD** |  |
+| FL01_05 | flood_same_creator | 400 | 400 | — → — | HELD | **HELD** |  |
+| FL01_06 | flood_same_creator | 429 | 429 | — → — | HELD | **HELD** |  |
+| FL01_07 | flood_same_creator | 429 | 429 | — → — | HELD | **HELD** |  |
+| FL01_08 | flood_same_creator | 429 | 429 | — → — | HELD | **HELD** |  |
+| FL01_09 | flood_same_creator | 429 | 429 | — → — | HELD | **HELD** |  |
+| FL01_10 | flood_same_creator | 429 | 429 | — → — | HELD | **HELD** |  |
+| FL01_11 | flood_same_creator | 429 | 429 | — → — | HELD | **HELD** |  |
+| FL01_12 | flood_same_creator | 429 | 429 | — → — | HELD | **HELD** |  |
 
+**Before: 46 held, 10 broke. After: 45 held, 11 broke.**
+
+### Run Log — After
+
+Run: `python run_eval.py --label after` → `results/run_2026-11-09_1948_after.md`.
+All three trials identical again.
+
+| Criterion | Target | Before (×3) | After Run 1 | After Run 2 | After Run 3 | Verdict after |
+|---|---|---|---|---|---|---|
+| 1. Second-language writers labelled high-confidence AI | ≤ 2 of 10 | 0/10 | 0/10 | 0/10 | 0/10 | MET |
+| 2. Mean confidence, clearly-AI minus clearly-human | ≥ 0.75 | 0.450 | 0.649 | 0.649 | 0.649 | MISSED |
+| 3. All three labels reachable | 3 of 3 | 3/3 | 3/3 | 3/3 | 3/3 | MET |
+| 4. Appeal recorded, under_review, + 404 / 409 / original unchanged | 5 of 5 + 3 | 5/5 + 3/3 | 5/5 + 3/3 | 5/5 + 3/3 | 5/5 + 3/3 | MET |
+| 5. Bad input → 400 with the right code and a log entry, never 500 | 7 of 7 | 7/7 | 7/7 | 7/7 | 7/7 | MET |
+
+Criterion 2 in detail: clearly-AI 0.830 → 0.855, clearly-human 0.380 → **0.206**.
+All five human samples are now labelled `human`; before, three were `unsure`.
+Criterion 1's highest L2 score went from 0.787 to 0.774.
 
 **Did it help, and how do I know:**
 
 <!-- Widening the unsure band usually fixes one problem and creates another.
      Reporting that trade honestly is worth full credit. -->
 
+**In one sentence: it helped on my own criteria and made the attack set worse.**
+Criterion 2 went from 0.450 to 0.649 (still MISSED), but the attack set went from
+10 broke to 11, and four AI-text attacks moved from "unsure" to a confident "human".
 
+- **What it fixed:** native human prose now scores clearly human (mean 0.206, all
+  five labelled `human`), and nothing in criteria 1, 3, 4 or 5 got worse. I know
+  this from three identical trials before and after.
+- **What it broke:** the steeper curve treats all text above perplexity 28 as human,
+  and the attack set's short AI text sits at 33–37. EV02, EV06, EV07 and PI01 went
+  from "unsure" to "human"; PI01 is newly broken. Signal one fell from ~0.6 to
+  ~0.25 on all of them. Exactly the overlap Diagnosis 1 named.
+- **What it moved closer to the line:** the steeper curve pushes text *below* 28
+  toward AI, too. FP04 (student essay) went 0.762 → **0.792** and FP03 (non-native
+  writer) 0.773 → **0.789**, 0.008 and 0.011 from an accusation. No human was
+  accused, but two are much closer than before.
+- **What my own prediction missed:** the sweep counted how many attacks were
+  labelled `ai` (0 before, 0 after) and never how many were labelled `human`. So it
+  reported "no change" on the evasions and missed this damage. The table above is
+  what caught it.
+
+**Would I keep it?** For a writing site, I'd revert it. The point of the system is
+to avoid wrongly accusing a writer while still being some obstacle to AI text. This
+change gives AI text a confident "human" label more often, and brings two real
+writers within 0.01 of an accusation, in exchange for a better number on the text I
+tuned against. The change stays in the repo so the before/after above matches the
+code; reverting it is two numbers in `detector.py::model_signal`.
 
 ---
 

@@ -133,8 +133,12 @@ def model_signal(text: str) -> float:
     """
     ppl = perplexity(text)
 
-    midpoint = 45.0    # perplexity that scores 0.5
-    steepness = 1.6    # how sharply the score moves either side of it
+    # Unit 8 Milestone 5 — was 45.0 / 1.6 (starter defaults). 45 sat inside the
+    # human perplexity range (40–75), so plain human prose scored 0.31–0.55. 28 is
+    # between AI (8–20) and human; steepness 4 pushes each side toward its end.
+    # See results/signal_one_sweep_2026-11-09.md.
+    midpoint = 28.0    # perplexity that scores 0.5
+    steepness = 4.0    # how sharply the score moves either side of it
 
     # Logistic on log-perplexity. Low perplexity -> high AI score.
     score = 1.0 / (1.0 + (ppl / midpoint) ** steepness)
