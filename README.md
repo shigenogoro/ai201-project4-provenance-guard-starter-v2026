@@ -421,6 +421,22 @@ hit the 5/minute limit and test the limiter instead of validation.
    Caveat: it checks that the request left *a* matching entry, not that it left
    *exactly one*.
 
+**Arguing the opposite verdict on criterion 1.** The strongest case that it is
+MISSED: 0.80 was chosen *after* seeing these 10 pieces score up to 0.79, so a pass
+on them proves only that the line sits above them. At 0.75, 4 of 10 are accused.
+Measured on these samples, the criterion couldn't fail. Two pieces of evidence
+would settle it, and I collected both:
+- *Second-language writing the threshold never saw.* The attack set's FP03 ("a
+  non-native English speaker writing carefully") scored 0.7725, "unsure". It held,
+  but by 0.03.
+- *The same writers, submitting slightly different text.* I re-scored each of the
+  10 pieces without its first sentence and without its last (20 variants): 0 of 20
+  labelled AI, max 0.787 (`results/signal_one_sweep_2026-11-09.md`).
+
+The verdict stays **MET**, because the target held on the fixed set and on both
+checks. The counterargument still stands as a warning: every L2 piece scores
+0.64–0.79, and the margin exists only because of where I put the line.
+
 **Real output, trial 1 of each** — file `results/run_2026-11-09_1930_before.md`, produced by `run_eval.py::main`.
 
 *Criterion 1 — second-language writers* (`run_eval.py::main`)
@@ -1076,20 +1092,36 @@ sentences and dashes (style 0.167). Both signals saw a human-written text becaus
 by the measures they use, it now is one. I'd treat that as co-written text, not a
 defect to fix.
 
-**Criterion 2 (MISSED) — signal one's calibration puts human prose in the middle of
-the scale.** The miss is at the human end: AI averaged 0.830, but clearly human
-text only reached 0.380. My five human samples have perplexity 40–75, which straddles
-signal one's midpoint of 45, so signal one gives them only 0.31–0.55. A score under
-0.1 needs perplexity above roughly 180. The average can't go lower than its inputs,
-so even with style scores of 0.05–0.54 the human set averages 0.38. A gap of 0.75
-would need the human set near 0.08 — both signals close to zero. **Stage: signal one
-(its midpoint, still the starter default). Mechanism: the logistic is centred inside
-the human perplexity range rather than between the AI and human ranges.**
+**Criterion 2 (MISSED) — the combining rule can't produce this gap from these two
+signals.** The combined gap is the 50/50 average of the two signals' own gaps.
+- Signal one separates AI from human by 0.408. My human samples have perplexity
+  40–75, against 8–20 for AI. The midpoint (45, still the starter default) sits
+  inside the human range, and steepness 1.6 is gentle, so human prose only scores
+  0.31–0.55.
+- Signal two separates them by 0.492 (AI 0.795, human 0.304).
 
-**The two diagnoses share a cause.** Signal one's fixed midpoint doesn't fit the
-text it actually sees. Short AI text scores too low (Diagnosis 1), and ordinary
-human prose lands in the middle (criterion 2). Both pull scores toward "unsure",
-and "unsure" lets the text through.
+So the combined gap is (0.408 + 0.492) / 2 = 0.450. The decisive number: **even a
+perfect signal one (gap 1.0) would average with signal two to (1.0 + 0.492) / 2 =
+0.746, still under 0.75.** **Stage: the combining rule, fed by two signals that each
+separate by under 0.5. Mechanism: an average's gap can't exceed the average of its
+inputs' gaps, and signal two's 0.49 makes 0.75 unreachable.** I first blamed signal
+one's midpoint; the sweep in `results/signal_one_sweep_2026-11-09.md` disproved
+that. Moving the midpoint alone lowers AI and human scores together, and the gap
+moves only 0.450 → 0.481.
+
+**Across all eleven problems: signal one can't separate short AI text from
+second-language writing.** The unedited 85-word AI text has perplexity 33, inside
+my L2 writers' range of 18–41. This shows up in two places:
+- Diagnosis 1: the AI threshold had to rise to 0.80 to stop accusing L2 writers,
+  which leaves short AI text in "unsure".
+- The sweep: no midpoint or steepness I tried labels a single evasion as AI (0 of
+  10 in every setting).
+
+Recalibrating signal one *can* widen the gap between long AI text and native human
+prose. At midpoint 28 and steepness 4, the criterion 2 gap goes to 0.649. Criterion 1
+(0/10), its variants (0/20) and FP01–FP07 (0/7) stay unchanged, and all three labels
+stay reachable. But it can't fix the evasions, because the overlap is in the text
+itself, not in the scale.
 
 ---
 
